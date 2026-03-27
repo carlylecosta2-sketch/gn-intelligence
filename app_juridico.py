@@ -32,55 +32,37 @@ def definir_responsavel_automatico():
         if p not in contagem: contagem[p] = 0
     return min(contagem, key=contagem.get)
 
-# --- 📄 RELATÓRIO PDF (VERSÃO CORRIGIDA: SEM SÍMBOLOS E NOMES COMPLETOS) ---
+# --- 📄 RELATÓRIO PDF (CORRIGIDO) ---
 def gerar_relatorio_pdf(df):
     try:
         pdf = FPDF()
         pdf.add_page()
-        
-        # Título
         pdf.set_font("Arial", "B", 14)
         pdf.cell(190, 10, "GUALBERTO & NEGREIROS SOCIEDADE DE ADVOGADOS", ln=True, align="C")
-        
         pdf.set_font("Arial", "", 10)
         pdf.cell(190, 10, f"Mapa de Prazos - Gerado em {datetime.date.today().strftime('%d/%m/%Y')}", ln=True, align="C")
         pdf.ln(10)
-        
-        # Cabeçalho da Tabela
         pdf.set_font("Arial", "B", 8)
-        pdf.set_fill_color(26, 58, 90) # Azul G&N
+        pdf.set_fill_color(26, 58, 90)
         pdf.set_text_color(255, 255, 255)
-        
-        # Ajuste de larguras para nomes maiores
         pdf.cell(40, 10, "Processo", border=1, fill=True)
         pdf.cell(55, 10, "Partes", border=1, fill=True)
-        pdf.cell(40, 10, "Peca", border=1, fill=True)
+        pdf.cell(40, 10, "Peca Sugerida", border=1, fill=True)
         pdf.cell(30, 10, "Responsavel", border=1, fill=True)
         pdf.cell(25, 10, "Vencimento", border=1, fill=True)
         pdf.ln()
-        
         pdf.set_text_color(0, 0, 0)
         pdf.set_font("Arial", "", 7)
-        
         for _, row in df.iterrows():
-            # Função de limpeza para converter caracteres especiais para o padrão do PDF
-            def formatar_texto(texto):
-                if pd.isna(texto): return ""
-                # Substitui caracteres comuns que costumam falhar no FPDF padrão
-                return str(texto).encode('windows-1252', 'replace').decode('windows-1252')
-
-            # Removido o limite de caracteres [:X] para que saiam por completo
-            pdf.cell(40, 10, formatar_texto(row['Processo']), border=1)
-            pdf.cell(55, 10, formatar_texto(row['Partes']), border=1)
-            pdf.cell(40, 10, formatar_texto(row['Peça Sugerida']), border=1)
-            pdf.cell(30, 10, formatar_texto(row.get('Responsável', 'N/A')), border=1)
-            pdf.cell(25, 10, formatar_texto(row['Vencimento']), border=1)
+            def limpar(t): return str(t).encode('windows-1252', 'replace').decode('windows-1252')
+            pdf.cell(40, 10, limpar(row['Processo']), border=1)
+            pdf.cell(55, 10, limpar(row['Partes']), border=1)
+            pdf.cell(40, 10, limpar(row['Peça Sugerida']), border=1)
+            pdf.cell(30, 10, limpar(row.get('Responsável', 'N/A')), border=1)
+            pdf.cell(25, 10, limpar(row['Vencimento']), border=1)
             pdf.ln()
-            
         return bytes(pdf.output())
-    except Exception as e:
-        st.error(f"Erro ao gerar PDF: {e}")
-        return None
+    except: return None
 
 # --- 📅 MOTOR DE CÁLCULO (MOSSORÓ/RN) ---
 def eh_feriado_ou_fds(data):
@@ -92,7 +74,6 @@ def calcular_vencimento(dias, data_base_str):
         data_inicio = datetime.datetime.strptime(data_base_str, "%Y-%m-%d").date()
     except:
         data_inicio = datetime.date.today()
-    
     data_atual = data_inicio
     cont = 0
     try: d = int(dias)
@@ -102,15 +83,19 @@ def calcular_vencimento(dias, data_base_str):
         if not eh_feriado_ou_fds(data_atual): cont += 1
     return data_atual
 
-# --- 🧠 INTELIGÊNCIA JURÍDICA ESTRATÉGICA ---
+# --- 🧠 INTELIGÊNCIA JURÍDICA (FOCO EM PETIÇÕES E PARECER) ---
 def analisar_documento_co_piloto(texto):
     if client is None: return None
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "Consultor Estratégico G&N. Extraia dados em JSON e localize a data do documento (YYYY-MM-DD)."},
-                {"role": "user", "content": f"Analise e retorne JSON: {{'processo':'','partes':'','data_documento':'YYYY-MM-DD','tipo_doc':'','peca_principal_sugerida':'','prazo':15,'resumo':'','parecer_risco':'','rascunho_estrutura':'','sugestoes_alternativas':[],'prioridade':''}}. Texto: {texto[:12000]}"}
+                {"role": "system", "content": """Você é o Co-piloto Jurídico da G&N Advogados em Mossoró/RN.
+                Sua prioridade absoluta é: 
+                1. Identificar TODAS as petições cabíveis para o momento processual.
+                2. Fornecer um Parecer de Risco detalhado sobre as consequências da decisão ou mandado.
+                Retorne SEMPRE em JSON com as chaves exatas: 'processo', 'partes', 'data_documento', 'parecer_estrategico', 'peca_principal', 'rascunho_estrutura', 'outras_peticoes', 'prazo', 'prioridade'."""},
+                {"role": "user", "content": f"Analise profundamente e sugira as peças ideais. Texto: {texto[:12000]}"}
             ],
             response_format={ "type": "json_object" }
         )
@@ -120,7 +105,7 @@ def analisar_documento_co_piloto(texto):
 
 # --- 🏛️ INTERFACE ---
 st.set_page_config(page_title="GN - Consultoria Estratégica", page_icon="🏛️", layout="wide")
-st.title("🏛️ G&N Intelligence: Co-piloto Estratégico")
+st.title("🏛️ G&N Intelligence: Co-piloto Estratégico & Gestão")
 
 c_in, c_out = st.columns([1, 1.2], gap="large")
 
@@ -129,12 +114,12 @@ with c_in:
     pdf_input = st.file_uploader("PDF:", type="pdf")
     txt_input = st.text_area("Texto:", height=150)
     
-    if st.button("🚀 GERAR ESTRUTURA E DISTRIBUIR"):
+    if st.button("🚀 GERAR PARECER E ESTRUTURA"):
         raw = ""
         if pdf_input: raw = "".join([p.extract_text() for p in pypdf.PdfReader(pdf_input).pages])
         elif txt_input: raw = txt_input
         if raw:
-            with st.spinner("Analisando rito processual..."):
+            with st.spinner("Genina traçando estratégia processual..."):
                 res = analisar_documento_co_piloto(raw)
                 if res:
                     st.session_state['res_gn'] = res
@@ -147,25 +132,31 @@ with c_out:
         venc = st.session_state['venc_gn'].strftime('%d/%m/%Y')
         resp = st.session_state['resp_gn']
         
-        st.subheader("📑 Diagnóstico e Atribuição")
-        st.warning(f"⚖️ **Responsável:** {resp}")
-        st.write(f"**Proc:** `{res['processo']}`")
-        st.write(f"**Partes:** `{res['partes']}`")
+        st.subheader("📑 Diagnóstico da Genina")
+        st.warning(f"⚖️ **Responsável:** {resp} | **Vencimento:** {venc}")
+        st.write(f"**Proc:** `{res.get('processo', 'Não localizado')}`")
+        st.write(f"**Partes:** `{res.get('partes', 'Não localizadas')}`")
         
-        with st.expander("📝 PARECER DE RISCO", expanded=True):
-            st.info(res['parecer_risco'])
+        # FOCO NO PARECER ESTRATÉGICO
+        st.markdown("### 📝 Parecer Estratégico e Riscos")
+        st.info(res.get('parecer_estrategico', 'Análise em processamento...'))
         
-        st.text_area("Esqueleto da Defesa:", value=res['rascunho_estrutura'], height=200)
+        # FOCO NAS PETIÇÕES
+        st.markdown(f"### 🛠️ Peça Sugerida: **{res.get('peca_principal', 'Não definida')}**")
+        st.text_area("Esqueleto da Petição:", value=res.get('rascunho_estrutura', ''), height=200)
+        
+        st.markdown("### 📖 Outras Petições Possíveis")
+        st.write(res.get('outras_peticoes', 'Nenhuma petição secundária sugerida.'))
         
         if st.button("📥 CONFIRMAR E SALVAR NA AGENDA"):
             nova_linha = {
-                "Data Cadastro": datetime.date.today().strftime('%d/%m/%Y'),
-                "Processo": res['processo'], 
-                "Partes": res['partes'], 
-                "Peça Sugerida": res['peca_principal_sugerida'], 
+                "Data": datetime.date.today().strftime('%d/%m/%Y'),
+                "Processo": res.get('processo','-'), 
+                "Partes": res.get('partes','-'), 
+                "Peça Sugerida": res.get('peca_principal','-'), 
                 "Responsável": resp, 
                 "Vencimento": venc, 
-                "Prioridade": res['prioridade']
+                "Prioridade": res.get('prioridade','Média')
             }
             pd.DataFrame([nova_linha]).to_csv('prazos_gn.csv', mode='a', index=False, header=not os.path.exists('prazos_gn.csv'), sep=';', encoding='utf-8-sig')
             st.success(f"✅ Salvo com sucesso!")
@@ -188,4 +179,4 @@ if os.path.exists('prazos_gn.csv'):
 else:
     st.info("Nenhum prazo pendente.")
 
-st.sidebar.markdown(f"**Escritório:** G&N Advogados\n\n**Equipe:** {', '.join(PROFISSIONAIS)}")
+st.sidebar.markdown(f"**Equipe:** {', '.join(PROFISSIONAIS)}")
