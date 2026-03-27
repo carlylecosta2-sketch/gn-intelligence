@@ -32,37 +32,83 @@ def definir_responsavel_automatico():
         if p not in contagem: contagem[p] = 0
     return min(contagem, key=contagem.get)
 
-# --- 📄 RELATÓRIO PDF (CORRIGIDO) ---
+# --- 📄 RELATÓRIO PDF (VERSÃO CORRIGIDA: TEXTO QUEBRA LINHA AUTOMATICAMENTE) ---
 def gerar_relatorio_pdf(df):
     try:
         pdf = FPDF()
         pdf.add_page()
+        
+        # Título Profissional
         pdf.set_font("Arial", "B", 14)
         pdf.cell(190, 10, "GUALBERTO & NEGREIROS SOCIEDADE DE ADVOGADOS", ln=True, align="C")
+        
         pdf.set_font("Arial", "", 10)
         pdf.cell(190, 10, f"Mapa de Prazos - Gerado em {datetime.date.today().strftime('%d/%m/%Y')}", ln=True, align="C")
         pdf.ln(10)
+        
+        # Configuração da Tabela
+        # Larguras: Proc(35), Partes(55), Peca(45), Resp(30), Venc(25) = 190mm
+        widths = [35, 55, 45, 30, 25]
+        headers = ["Processo", "Partes", "Peca Sugerida", "Responsavel", "Vencimento"]
+        
         pdf.set_font("Arial", "B", 8)
-        pdf.set_fill_color(26, 58, 90)
+        pdf.set_fill_color(26, 58, 90) # Azul G&N
         pdf.set_text_color(255, 255, 255)
-        pdf.cell(40, 10, "Processo", border=1, fill=True)
-        pdf.cell(55, 10, "Partes", border=1, fill=True)
-        pdf.cell(40, 10, "Peca Sugerida", border=1, fill=True)
-        pdf.cell(30, 10, "Responsavel", border=1, fill=True)
-        pdf.cell(25, 10, "Vencimento", border=1, fill=True)
+        
+        for i, header in enumerate(headers):
+            pdf.cell(widths[i], 10, header, border=1, fill=True, align="C")
         pdf.ln()
+        
         pdf.set_text_color(0, 0, 0)
         pdf.set_font("Arial", "", 7)
+        
         for _, row in df.iterrows():
-            def limpar(t): return str(t).encode('windows-1252', 'replace').decode('windows-1252')
-            pdf.cell(40, 10, limpar(row['Processo']), border=1)
-            pdf.cell(55, 10, limpar(row['Partes']), border=1)
-            pdf.cell(40, 10, limpar(row['Peça Sugerida']), border=1)
-            pdf.cell(30, 10, limpar(row.get('Responsável', 'N/A')), border=1)
-            pdf.cell(25, 10, limpar(row['Vencimento']), border=1)
-            pdf.ln()
+            # Tratamento de caracteres especiais
+            def f(t): return str(t).encode('windows-1252', 'replace').decode('windows-1252')
+            
+            # Cálculo de altura da linha (baseado na maior célula da linha)
+            # Usamos multi_cell para as colunas que podem ser longas
+            line_height = 8
+            
+            # Dados tratados
+            proc = f(row['Processo'])
+            partes = f(row['Partes'])
+            peca = f(row['Peça Sugerida'])
+            resp = f(row.get('Responsável', 'N/A'))
+            venc = f(row['Vencimento'])
+
+            # Para manter a tabela alinhada com multi_cell, precisamos capturar o Y inicial
+            x_start = pdf.get_x()
+            y_start = pdf.get_y()
+
+            # Desenha as colunas mantendo o alinhamento de tabela
+            pdf.multi_cell(widths[0], line_height, proc, border=1, align="L")
+            y_proc = pdf.get_y()
+            
+            pdf.set_xy(x_start + widths[0], y_start)
+            pdf.multi_cell(widths[1], line_height, partes, border=1, align="L")
+            y_partes = pdf.get_y()
+            
+            pdf.set_xy(x_start + widths[0] + widths[1], y_start)
+            pdf.multi_cell(widths[2], line_height, peca, border=1, align="L")
+            y_peca = pdf.get_y()
+            
+            pdf.set_xy(x_start + widths[0] + widths[1] + widths[2], y_start)
+            pdf.multi_cell(widths[3], line_height, resp, border=1, align="C")
+            y_resp = pdf.get_y()
+            
+            pdf.set_xy(x_start + widths[0] + widths[1] + widths[2] + widths[3], y_start)
+            pdf.multi_cell(widths[4], line_height, venc, border=1, align="C")
+            y_venc = pdf.get_y()
+            
+            # Move para a próxima linha baseando-se na célula mais alta
+            max_y = max(y_proc, y_partes, y_peca, y_resp, y_venc)
+            pdf.set_y(max_y)
+
         return bytes(pdf.output())
-    except: return None
+    except Exception as e:
+        st.error(f"Erro ao gerar PDF: {e}")
+        return None
 
 # --- 📅 MOTOR DE CÁLCULO (MOSSORÓ/RN) ---
 def eh_feriado_ou_fds(data):
@@ -83,19 +129,15 @@ def calcular_vencimento(dias, data_base_str):
         if not eh_feriado_ou_fds(data_atual): cont += 1
     return data_atual
 
-# --- 🧠 INTELIGÊNCIA JURÍDICA (FOCO EM PETIÇÕES E PARECER) ---
+# --- 🧠 INTELIGÊNCIA JURÍDICA ---
 def analisar_documento_co_piloto(texto):
     if client is None: return None
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": """Você é o Co-piloto Jurídico da G&N Advogados em Mossoró/RN.
-                Sua prioridade absoluta é: 
-                1. Identificar TODAS as petições cabíveis para o momento processual.
-                2. Fornecer um Parecer de Risco detalhado sobre as consequências da decisão ou mandado.
-                Retorne SEMPRE em JSON com as chaves exatas: 'processo', 'partes', 'data_documento', 'parecer_estrategico', 'peca_principal', 'rascunho_estrutura', 'outras_peticoes', 'prazo', 'prioridade'."""},
-                {"role": "user", "content": f"Analise profundamente e sugira as peças ideais. Texto: {texto[:12000]}"}
+                {"role": "system", "content": "Consultor G&N Mossoro/RN. Extraia dados em JSON e identifique a data do documento (YYYY-MM-DD)."},
+                {"role": "user", "content": f"Analise profundamente. Retorne JSON: {{'processo':'','partes':'','data_documento':'YYYY-MM-DD','tipo_doc':'','peca_principal':'','prazo':15,'resumo':'','parecer_estrategico':'','rascunho_estrutura':'','outras_peticoes':'','prioridade':''}}. Texto: {texto[:12000]}"}
             ],
             response_format={ "type": "json_object" }
         )
@@ -114,12 +156,12 @@ with c_in:
     pdf_input = st.file_uploader("PDF:", type="pdf")
     txt_input = st.text_area("Texto:", height=150)
     
-    if st.button("🚀 GERAR PARECER E ESTRUTURA"):
+    if st.button("🚀 GERAR ESTRUTURA E DISTRIBUIR"):
         raw = ""
         if pdf_input: raw = "".join([p.extract_text() for p in pypdf.PdfReader(pdf_input).pages])
         elif txt_input: raw = txt_input
         if raw:
-            with st.spinner("Genina traçando estratégia processual..."):
+            with st.spinner("Genina analisando rito processual..."):
                 res = analisar_documento_co_piloto(raw)
                 if res:
                     st.session_state['res_gn'] = res
@@ -134,19 +176,13 @@ with c_out:
         
         st.subheader("📑 Diagnóstico da Genina")
         st.warning(f"⚖️ **Responsável:** {resp} | **Vencimento:** {venc}")
-        st.write(f"**Proc:** `{res.get('processo', 'Não localizado')}`")
-        st.write(f"**Partes:** `{res.get('partes', 'Não localizadas')}`")
+        st.write(f"**Proc:** `{res.get('processo', '-')}` | **Partes:** `{res.get('partes', '-')}`")
         
-        # FOCO NO PARECER ESTRATÉGICO
-        st.markdown("### 📝 Parecer Estratégico e Riscos")
-        st.info(res.get('parecer_estrategico', 'Análise em processamento...'))
+        st.markdown("### 📝 Parecer Estratégico")
+        st.info(res.get('parecer_estrategico', '-'))
         
-        # FOCO NAS PETIÇÕES
-        st.markdown(f"### 🛠️ Peça Sugerida: **{res.get('peca_principal', 'Não definida')}**")
-        st.text_area("Esqueleto da Petição:", value=res.get('rascunho_estrutura', ''), height=200)
-        
-        st.markdown("### 📖 Outras Petições Possíveis")
-        st.write(res.get('outras_peticoes', 'Nenhuma petição secundária sugerida.'))
+        st.markdown(f"### 🛠️ Peça: **{res.get('peca_principal', '-')}**")
+        st.text_area("Esqueleto:", value=res.get('rascunho_estrutura', ''), height=200)
         
         if st.button("📥 CONFIRMAR E SALVAR NA AGENDA"):
             nova_linha = {
@@ -159,7 +195,7 @@ with c_out:
                 "Prioridade": res.get('prioridade','Média')
             }
             pd.DataFrame([nova_linha]).to_csv('prazos_gn.csv', mode='a', index=False, header=not os.path.exists('prazos_gn.csv'), sep=';', encoding='utf-8-sig')
-            st.success(f"✅ Salvo com sucesso!")
+            st.success("✅ Salvo com sucesso!")
 
 st.divider()
 
@@ -175,7 +211,7 @@ if os.path.exists('prazos_gn.csv'):
     with col2:
         pdf_bytes = gerar_relatorio_pdf(dados)
         if pdf_bytes:
-            st.download_button(label="📥 BAIXAR RELATÓRIO PDF", data=pdf_bytes, file_name=f"Relatorio_GN_{datetime.date.today()}.pdf", mime="application/pdf")
+            st.download_button(label="📥 BAIXAR RELATÓRIO PDF (AJUSTADO)", data=pdf_bytes, file_name=f"Relatorio_GN_{datetime.date.today()}.pdf", mime="application/pdf")
 else:
     st.info("Nenhum prazo pendente.")
 
