@@ -7,132 +7,118 @@ import os
 from openai import OpenAI
 
 # --- ⚙️ CONFIGURAÇÕES E INICIALIZAÇÃO SEGURA ---
-
-# 1. Definimos o client como None inicialmente para evitar o erro de 'not defined'
 client = None
-
 try:
-    # Tentativa de carregar as chaves do "Cofre" (Secrets)
-    # O .strip() é essencial para remover espaços invisíveis que cancelam a chave
     if "OPENAI_KEY" in st.secrets:
-        OPENAI_KEY = st.secrets["OPENAI_KEY"].strip()
-        client = OpenAI(api_key=OPENAI_KEY)
+        client = OpenAI(api_key=st.secrets["OPENAI_KEY"].strip())
     else:
-        st.error("❌ Erro Crítico: A chave 'OPENAI_KEY' não foi encontrada nos Secrets.")
+        st.error("❌ Chave OpenAI não encontrada nos Secrets.")
 except Exception as e:
-    st.error(f"⚠️ Erro ao inicializar a chave: {e}")
+    st.error(f"⚠️ Erro Crítico: {e}")
 
 # --- IDENTIDADE VISUAL G&N ---
-st.set_page_config(page_title="GN - Inteligência Processual", page_icon="🏛️", layout="wide")
+st.set_page_config(page_title="GN - Consultoria Estratégica", page_icon="🏛️", layout="wide")
+st.markdown("<style>.stMetric { background-color: #ffffff; border-left: 5px solid #1a3a5a; border-radius: 10px; }</style>", unsafe_allow_html=True)
 
-st.markdown("""
-    <style>
-    .main { background-color: #f5f7f9; }
-    .stButton>button { width: 100%; background-color: #1a3a5a; color: white; border-radius: 10px; font-weight: bold; }
-    .stMetric { background-color: white; padding: 15px; border-radius: 10px; box-shadow: 2px 2px 5px rgba(0,0,0,0.05); }
-    </style>
-    """, unsafe_allow_html=True)
-
-# MODO SEGURO: O código não sabe a chave, ele pede ao arquivo local
-def carregar_config():
-    if not os.path.exists("config_gn.txt"):
-        # Se o arquivo não existir, cria um modelo vazio
-        with open("config_gn.txt", "w") as f:
-            f.write("OPENAI_KEY=COLE_SUA_CHAVE_AQUI")
-        return None
-
-# --- ⚖️ MOTOR DE MOSSORÓ/RN ---
+# --- MOTOR DE CÁLCULO MOSSORÓ/RN ---
 def eh_feriado_ou_fds(data):
     # Feriados de Mossoró e Nacionais
     feriados = [(1,1),(13,6),(7,9),(30,9),(3,10),(12,10),(2,11),(15,11),(13,12),(25,12)]
     return data.weekday() >= 5 or (data.day, data.month) in feriados
 
-def calcular_vencimento(dias_uteis):
+def calcular_vencimento(dias):
     data = datetime.date.today()
     cont = 0
-    while cont < dias_uteis:
+    try: d = int(dias)
+    except: d = 15 # Padrão se IA falhar
+    while cont < d:
         data += datetime.timedelta(days=1)
         if not eh_feriado_ou_fds(data): cont += 1
     return data
 
-# --- 🤖 INTELIGÊNCIA ---
-def analisar_documento(texto):
-    # Verificação de segurança antes de prosseguir
-    if client is None:
-        return {"processo": "Erro", "peca": "Erro", "prazo": "0", "resumo": "Configuração de IA ausente.", "prioridade": "N/A"}
-        
+# --- 🧠 INTELIGÊNCIA JURÍDICA ESTRATÉGICA ---
+def analisar_documento_co_piloto(texto):
+    if client is None: return None
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "Você é o consultor jurídico sênior da G&N Advogados em Mossoró. Extraia dados em JSON."},
-                {"role": "user", "content": f"Analise o texto jurídico e extraia: 'processo', 'tipo_doc', 'peca', 'prazo' (apenas número), 'resumo', 'prioridade'. Documento: {texto[:12000]}"}
+                {"role": "system", "content": """Você é o Co-piloto Estratégico Sênior da Gualberto & Negreiros em Mossoró/RN, especialista em Direito Público e Administrativo.
+                Sua tarefa é analisar o documento e fornecer um diagnóstico técnico rigoroso em JSON.
+                O campo 'parecer_risco' deve conter uma análise de riscos e teses defensivas.
+                O campo 'rascunho_estrutura' deve conter o rascunho da estrutura (esqueleto) da Peça Principal Sugerida, com tópicos e fundamentos legais baseados no CPC (ex: Preliminares, Mérito, Pedidos).
+                O campo 'sugestoes_alternativas' deve listar as demais peças cabíveis."""},
+                {"role": "user", "content": f"Analise profundamente e retorne JSON: {{'processo':'','tipo_doc':'','peca_principal_sugerida':'','prazo':15,'resumo':'','parecer_risco':'','rascunho_estrutura':'','sugestoes_alternativas':[],'prioridade':''}}. Texto: {texto[:12000]}"}
             ],
             response_format={ "type": "json_object" }
         )
         return json.loads(response.choices[0].message.content)
     except Exception as e:
-        st.error(f"Erro na análise da OpenAI: {e}")
+        st.error(f"Erro na análise estratégica: {e}")
         return None
 
-# --- 🏛️ INTERFACE ---
-st.title("🏛️ Genina OpenIA")
-st.caption("Gestão Estratégica de Prazos | Mossoró-RN | G&N Advogados")
+# --- 🏛️ INTERFACE G&N Intelligence ---
+st.title("🏛️ G&N Intelligence: Consultoria Estratégica & Co-piloto de Redação")
+st.caption("Diagnóstico Tático de Casos e Rascunho de Peças | Foco em Administração Pública")
 
-c_in, c_out = st.columns([1, 1], gap="large")
+c_in, c_out = st.columns([1, 1.2], gap="large")
 
 with c_in:
-    st.subheader("📥 Entrada")
-    pdf = st.file_uploader("Subir PDF:", type="pdf")
-    txt_manual = st.text_area("Ou cole o texto:", height=150)
+    st.subheader("📥 Entrada de Caso")
+    pdf = st.file_uploader("Upload de Mandado/Petição (PDF):", type="pdf")
+    txt = st.text_area("Ou cole o inteiro teor:", height=150)
     
-    if st.button("🚀 ANALISAR AGORA"):
-        raw_text = ""
+    if st.button("🚀 GERAR ESTRUTURA E PARECER"):
+        raw = ""
         if pdf:
-            reader = pypdf.PdfReader(pdf)
-            raw_text = "".join([p.extract_text() for p in reader.pages])
-        else:
-            raw_text = txt_manual
+            raw = "".join([p.extract_text() for p in pypdf.PdfReader(pdf).pages])
+        elif txt: raw = txt
             
-        if raw_text:
-            with st.spinner("Analisando rito processual..."):
-                res = analisar_documento(raw_text)
+        if raw:
+            with st.spinner("Genina analisando teses e estruturando defesa..."):
+                res = analisar_documento_co_piloto(raw)
                 if res:
                     st.session_state['res_gn'] = res
-                    st.session_state['venc_gn'] = calcular_vencimento(int(res['prazo']))
-        else:
-            st.warning("Insira um documento.")
+                    st.session_state['venc_gn'] = calcular_vencimento(res['prazo'])
 
 with c_out:
-    st.subheader("📑 Diagnóstico")
     if 'res_gn' in st.session_state:
-        res, venc = st.session_state['res_gn'], st.session_state['venc_gn']
-        v_fmt = venc.strftime('%d/%m/%Y')
+        res = st.session_state['res_gn']
+        venc = st.session_state['venc_gn'].strftime('%d/%m/%Y')
         
-        st.write(f"**Processo:** `{res['processo']}`")
-        m1, m2 = st.columns(2)
-        m1.metric("Peça", res['peca'])
-        m2.metric("Vencimento", v_fmt)
-        st.info(f"**Resumo:** {res['resumo']}")
+        st.subheader("📑 Diagnóstico e Estrutura de Defesa da Genina")
+        st.write(f"**Processo:** `{res['processo']}` | **Vencimento:** `{venc}`")
         
-        if st.button("📥 SALVAR NA AGENDA"):
-            df = pd.DataFrame([{"Processo": res['processo'], "Peça": res['peca'], "Vencimento": v_fmt, "Prioridade": res['prioridade']}])
-            df.to_csv('prazos_gn.csv', mode='a', index=False, header=not os.path.exists('prazos_gn.csv'), sep=';', encoding='utf-8-sig')
+        # Seção de Parecer
+        with st.expander("📝 PARECER PRÉVIO E ANÁLISE DE RISCO (Direito Administrativo)", expanded=True):
+            st.info(res['parecer_risco'])
+        
+        # Rascunho Estruturado (O Co-piloto)
+        st.write(f"**🛠️ ESTRUTURA SUGERIDA DA PEÇA PRINCIPAL (Rascunho)**")
+        st.write(f"*(Peça Sugerida: {res['peca_principal_sugerida']} | Prazo: {res['prazo']} úteis)*")
+        st.text_area("Copie o esqueleto da defesa:", value=res['rascunho_estrutura'], height=300)
+        
+        # Sugestões Alternativas
+        st.write("**📖 OUTRAS SUGESTÕES PROCESSUAIS**")
+        for peca in res['sugestoes_alternativas']:
+            st.markdown(f"- {peca}")
             
-            st.success("✅ Salvo com sucesso na agenda!")
-            st.balloons()
+        if st.button("📥 SALVAR NA AGENDA DO ESCRITÓRIO"):
+            df = pd.DataFrame([{"Data": datetime.date.today(), "Proc": res['processo'], "Peça": res['peca_principal_sugerida'], "Venc": venc}])
+            df.to_csv('prazos_gn.csv', mode='a', index=False, header=not os.path.exists('prazos_gn.csv'), sep=';', encoding='utf-8-sig')
+            st.success("✅ Caso e prazo arquivados na agenda com sucesso!")
 
 st.divider()
 
-# --- LISTA DE TAREFAS ---
-st.subheader("📋 Lista de Prazos Pendentes - G&N")
+# --- AGENDA DE TAREFAS ---
+st.subheader("📋 Lista de Prazos e Casos em Mossoró/RN")
 if os.path.exists('prazos_gn.csv'):
     dados = pd.read_csv('prazos_gn.csv', sep=';')
     st.dataframe(dados, use_container_width=True)
-    if st.button("🗑️ Limpar Agenda"):
+    if st.button("🗑️ Limpar Agenda Completa"):
         os.remove('prazos_gn.csv')
         st.rerun()
 else:
-    st.info("Nenhum prazo pendente.")
+    st.info("Nenhum prazo pendente salvo.")
 
 st.sidebar.markdown(f"**Responsável:** Dr. Carlyle Negreiros")
