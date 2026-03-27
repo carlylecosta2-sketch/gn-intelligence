@@ -147,7 +147,7 @@ def analisar_documento_co_piloto(texto):
 
 # --- 🏛️ INTERFACE ---
 st.set_page_config(page_title="GN - Estratégia Jurídica", page_icon="🏛️", layout="wide")
-st.title("🏛️ G&N Intelligence: Co-piloto Estratégico")
+st.title("🏛️ Genina IA - GN Advogados")
 
 c_in, c_out = st.columns([1, 1.2], gap="large")
 
