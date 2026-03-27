@@ -8,7 +8,7 @@ from openai import OpenAI
 from fpdf import FPDF
 
 # --- 👥 EQUIPE G&N ---
-PROFISSIONAIS = ["Dr. Carlyle", "Dra. Jaqueline"]
+PROFISSIONAIS = ["Dr. Carlyle", "Dra. Lorena"]
 
 # --- ⚙️ INICIALIZAÇÃO ---
 client = None
@@ -32,7 +32,7 @@ def definir_responsavel_automatico():
         if p not in contagem: contagem[p] = 0
     return min(contagem, key=contagem.get)
 
-# --- 📄 RELATÓRIO PDF (AJUSTADO: SEM ULTRAPASSAR LINHAS) ---
+# --- 📄 RELATÓRIO PDF (MANUTENÇÃO DE FORMATAÇÃO) ---
 def gerar_relatorio_pdf(df):
     try:
         pdf = FPDF()
@@ -58,8 +58,6 @@ def gerar_relatorio_pdf(df):
             def f(t): return str(t).encode('windows-1252', 'replace').decode('windows-1252')
             line_height = 7
             x, y = pdf.get_x(), pdf.get_y()
-            
-            # Colunas com Multi-cell para não vazar a linha
             pdf.multi_cell(widths[0], line_height, f(row['Processo']), border=1)
             y2 = pdf.get_y()
             pdf.set_xy(x + widths[0], y)
@@ -95,29 +93,30 @@ def calcular_vencimento(dias, data_base_str):
         if not eh_feriado_ou_fds(data_atual): cont += 1
     return data_atual
 
-# --- 🧠 INTELIGÊNCIA JURÍDICA (FOCO EM ESTRATÉGIA) ---
+# --- 🧠 INTELIGÊNCIA JURÍDICA REFINADA (ESTRATÉGIA DE FLUXO) ---
 def analisar_documento_co_piloto(texto):
     if client is None: return None
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": """Você é o Consultor Sênior da G&N Advogados. 
-                Sua missão é: 
-                1. Identificar o parecer estratégico (riscos e teses).
-                2. Sugerir a peça principal e outras petições cabíveis.
-                3. Extrair data do documento (YYYY-MM-DD)."""},
-                {"role": "user", "content": f"Analise o texto e retorne JSON estrito: {{'processo':'','partes':'','data_documento':'YYYY-MM-DD','parecer_estrategico':'','peca_principal':'','rascunho_estrutura':'','outras_peticoes':'','prazo':15,'prioridade':''}}. Texto: {texto[:12000]}"}
+                {"role": "system", "content": """Você é o Estrategista Processual Sênior da G&N Advogados.
+                Sua análise deve seguir este rigor:
+                1. CLASSIFIQUE o documento (é uma Decisão Interlocutória, Sentença, Despacho, Citação ou Intimação?).
+                2. IDENTIFIQUE o pedido originário (ex: o réu pediu EPE e o juiz decidiu sobre isso).
+                3. DETERMINE O PRÓXIMO PASSO: Se o documento é uma DECISÃO sobre um pedido, o próximo passo é RECORRER (Agravo, Embargos, etc) ou CUMPRIR. Jamais sugira repetir a peça que o juiz acabou de decidir.
+                4. SEJA ESPECÍFICO: Se o juiz negou algo, sugira o recurso cabível. Se o juiz citou para defesa, sugira Contestação."""},
+                {"role": "user", "content": f"Analise o texto e retorne JSON: {{'processo':'','partes':'','data_documento':'YYYY-MM-DD','tipo_documento_identificado':'','parecer_estrategico':'','peca_principal':'','rascunho_estrutura':'','outras_peticoes':'','prazo':15,'prioridade':''}}. Texto: {texto[:12000]}"}
             ],
             response_format={ "type": "json_object" }
         )
         return json.loads(response.choices[0].message.content)
     except Exception as e:
-        st.error(f"Erro na análise: {e}"); return None
+        st.error(f"Erro na análise estratégica: {e}"); return None
 
 # --- 🏛️ INTERFACE ---
 st.set_page_config(page_title="GN - Consultoria Estratégica", page_icon="🏛️", layout="wide")
-st.title("🏛️ G&N Intelligence: Estratégia Jurídica")
+st.title("🏛️ G&N Intelligence: Co-piloto Estratégico")
 
 c_in, c_out = st.columns([1, 1.2], gap="large")
 
@@ -131,7 +130,7 @@ with c_in:
         if pdf_input: raw = "".join([p.extract_text() for p in pypdf.PdfReader(pdf_input).pages])
         elif txt_input: raw = txt_input
         if raw:
-            with st.spinner("Genina traçando táticas processuais..."):
+            with st.spinner("Analisando fluxo processual e sugerindo próximo passo..."):
                 res = analisar_documento_co_piloto(raw)
                 if res:
                     st.session_state['res_gn'] = res
@@ -145,21 +144,23 @@ with c_out:
         resp = st.session_state['resp_gn']
         
         st.subheader("📑 Diagnóstico Estratégico")
-        st.warning(f"⚖️ **Responsável Sugerido:** {resp} | **Vencimento:** {venc}")
+        st.warning(f"⚖️ **Próximo Passo:** {res.get('peca_principal', 'Analisando...')}")
+        
+        col_a, col_b = st.columns(2)
+        col_a.write(f"**Tipo identificado:** `{res.get('tipo_documento_identificado', '-')}`")
+        col_b.write(f"**Responsável:** `{resp}`")
         
         st.write(f"**🔢 Processo:** `{res.get('processo', '-')}`")
         st.write(f"**👥 Partes:** `{res.get('partes', '-')}`")
         
-        # EXIBIÇÃO DO PARECER
-        st.markdown("### 📝 Parecer Estratégico de Risco")
-        st.info(res.get('parecer_estrategico', 'Informação não processada.'))
+        st.markdown("### 📝 Parecer de Risco e Próximo Passo")
+        st.info(res.get('parecer_estrategico', 'Sem parecer disponível.'))
         
-        # EXIBIÇÃO DA PEÇA E SUGESTÕES
-        st.markdown(f"### 🛠️ Peça Principal: **{res.get('peca_principal', '-')}**")
-        st.text_area("Rascunho da Defesa (Esqueleto):", value=res.get('rascunho_estrutura', ''), height=200)
+        st.markdown(f"### 🛠️ Estrutura da Peça Sugerida")
+        st.text_area("Rascunho (Esqueleto):", value=res.get('rascunho_estrutura', ''), height=200)
         
-        st.markdown("### 📖 Outras Petições/Sugestões")
-        st.write(res.get('outras_peticoes', 'Nenhuma sugestão adicional.'))
+        st.markdown("### 📖 Sugestões Secundárias")
+        st.write(res.get('outras_peticoes', '-'))
         
         if st.button("📥 CONFIRMAR E SALVAR NA AGENDA"):
             nova_linha = {
@@ -172,7 +173,7 @@ with c_out:
                 "Prioridade": res.get('prioridade','Média')
             }
             pd.DataFrame([nova_linha]).to_csv('prazos_gn.csv', mode='a', index=False, header=not os.path.exists('prazos_gn.csv'), sep=';', encoding='utf-8-sig')
-            st.success("✅ Salvo com sucesso!")
+            st.success("✅ Caso e tática processual arquivados!")
 
 st.divider()
 
