@@ -46,39 +46,53 @@ def definir_responsavel_automatico():
 
 # --- 📄 FUNÇÃO PARA GERAR O PDF COM COLUNA DE RESPONSÁVEL ---
 def gerar_relatorio_pdf(df):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", "B", 14)
-    pdf.cell(190, 10, "GUALBERTO & NEGREIROS SOCIEDADE DE ADVOGADOS", ln=True, align="C")
-    pdf.set_font("Arial", "", 10)
-    pdf.cell(190, 10, f"Mapa de Distribuicao de Prazos - Gerado em {datetime.date.today().strftime('%d/%m/%Y')}", ln=True, align="C")
-    pdf.ln(10)
-    
-    pdf.set_font("Arial", "B", 9)
-    pdf.set_fill_color(26, 58, 90) # Azul G&N
-    pdf.set_text_color(255, 255, 255)
-    
-    # Cabeçalho da Tabela
-    pdf.cell(35, 10, "Processo", border=1, fill=True)
-    pdf.cell(45, 10, "Partes", border=1, fill=True)
-    pdf.cell(40, 10, "Peca", border=1, fill=True)
-    pdf.cell(30, 10, "Responsavel", border=1, fill=True)
-    pdf.cell(30, 10, "Vencimento", border=1, fill=True)
-    pdf.ln()
-    
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Arial", "", 8)
-    
-    for _, row in df.iterrows():
-        pdf.cell(35, 10, str(row['Processo'])[:15], border=1)
-        pdf.cell(45, 10, str(row['Partes'])[:20], border=1)
-        pdf.cell(40, 10, str(row['Peça Sugerida'])[:18], border=1)
-        pdf.cell(30, 10, str(row.get('Responsável', 'N/A')), border=1)
-        pdf.cell(30, 10, str(row['Vencimento']), border=1)
+    try:
+        pdf = FPDF()
+        pdf.add_page()
+        
+        # Título Principal
+        pdf.set_font("Arial", "B", 14)
+        pdf.cell(190, 10, "GUALBERTO & NEGREIROS SOCIEDADE DE ADVOGADOS", ln=True, align="C")
+        
+        pdf.set_font("Arial", "", 10)
+        pdf.cell(190, 10, f"Mapa de Distribuicao - Gerado em {datetime.date.today().strftime('%d/%m/%Y')}", ln=True, align="C")
+        pdf.ln(10)
+        
+        # Cabeçalho da Tabela
+        pdf.set_font("Arial", "B", 8)
+        pdf.set_fill_color(26, 58, 90) # Azul G&N
+        pdf.set_text_color(255, 255, 255)
+        
+        pdf.cell(35, 10, "Processo", border=1, fill=True)
+        pdf.cell(45, 10, "Partes", border=1, fill=True)
+        pdf.cell(40, 10, "Peca", border=1, fill=True)
+        pdf.cell(30, 10, "Responsavel", border=1, fill=True)
+        pdf.cell(35, 10, "Vencimento", border=1, fill=True)
         pdf.ln()
         
-    return pdf.output(dest='S')
+        # Dados da Tabela
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font("Arial", "", 7)
+        
+        for _, row in df.iterrows():
+            # Tratamento de strings para evitar erros de codificação (Latin-1)
+            def limpar(texto):
+                return str(texto).encode('latin-1', 'replace').decode('latin-1')
 
+            pdf.cell(35, 10, limpar(row['Processo'])[:18], border=1)
+            pdf.cell(45, 10, limpar(row['Partes'])[:22], border=1)
+            pdf.cell(40, 10, limpar(row['Peça Sugerida'])[:20], border=1)
+            pdf.cell(30, 10, limpar(row.get('Responsável', 'N/A')), border=1)
+            pdf.cell(35, 10, limpar(row['Vencimento']), border=1)
+            pdf.ln()
+            
+        # O PULO DO GATO: Garantir que o retorno seja EXATAMENTE em bytes
+        return bytes(pdf.output()) 
+        
+    except Exception as e:
+        st.error(f"Erro ao gerar o PDF: {e}")
+        return None
+    
 # --- MOTOR DE CÁLCULO E IA ---
 def eh_feriado_ou_fds(data):
     feriados = [(1,1),(13,6),(7,9),(30,9),(3,10),(12,10),(2,11),(15,11),(13,12),(25,12)]
@@ -177,13 +191,16 @@ if os.path.exists('prazos_gn.csv'):
             os.remove('prazos_gn.csv'); st.rerun()
             
     with col2:
-        pdf_data = gerar_relatorio_pdf(dados)
-        st.download_button(
-            label="📥 BAIXAR RELATÓRIO DE DISTRIBUIÇÃO (PDF)",
-            data=pdf_data,
-            file_name=f"Mapa_Prazos_GN_{datetime.date.today()}.pdf",
-            mime="application/pdf",
-        )
+        pdf_bytes = gerar_relatorio_pdf(dados)
+        
+        # Só exibe o botão se os bytes foram gerados com sucesso
+        if pdf_bytes:
+            st.download_button(
+                label="📥 BAIXAR RELATÓRIO DE DISTRIBUIÇÃO (PDF)",
+                data=pdf_bytes,
+                file_name=f"Relatorio_Prazos_GN_{datetime.date.today()}.pdf",
+                mime="application/pdf",
+            )
 else:
     st.info("Nenhum prazo pendente.")
 
