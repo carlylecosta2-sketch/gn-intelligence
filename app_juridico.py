@@ -32,7 +32,7 @@ def definir_responsavel_automatico():
         if p not in contagem: contagem[p] = 0
     return min(contagem, key=contagem.get)
 
-# --- 📄 RELATÓRIO PDF (MANUTENÇÃO DE FORMATAÇÃO) ---
+# --- 📄 RELATÓRIO PDF (AJUSTADO E BLINDADO) ---
 def gerar_relatorio_pdf(df):
     try:
         pdf = FPDF()
@@ -76,7 +76,7 @@ def gerar_relatorio_pdf(df):
         return bytes(pdf.output())
     except: return None
 
-# --- 📅 MOTOR DE CÁLCULO ---
+# --- 📅 MOTOR DE CÁLCULO MOSSORÓ/RN ---
 def eh_feriado_ou_fds(data):
     feriados = [(1,1),(13,6),(7,9),(30,9),(3,10),(12,10),(2,11),(15,11),(13,12),(25,12)]
     return data.weekday() >= 5 or (data.day, data.month) in feriados
@@ -93,44 +93,46 @@ def calcular_vencimento(dias, data_base_str):
         if not eh_feriado_ou_fds(data_atual): cont += 1
     return data_atual
 
-# --- 🧠 INTELIGÊNCIA JURÍDICA REFINADA (ESTRATÉGIA DE FLUXO) ---
+# --- 🧠 CÉREBRO ESTRATÉGICO G&N (REFORMULADO) ---
 def analisar_documento_co_piloto(texto):
     if client is None: return None
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": """Você é o Estrategista Processual Sênior da G&N Advogados.
-                Sua análise deve seguir este rigor:
-                1. CLASSIFIQUE o documento (é uma Decisão Interlocutória, Sentença, Despacho, Citação ou Intimação?).
-                2. IDENTIFIQUE o pedido originário (ex: o réu pediu EPE e o juiz decidiu sobre isso).
-                3. DETERMINE O PRÓXIMO PASSO: Se o documento é uma DECISÃO sobre um pedido, o próximo passo é RECORRER (Agravo, Embargos, etc) ou CUMPRIR. Jamais sugira repetir a peça que o juiz acabou de decidir.
-                4. SEJA ESPECÍFICO: Se o juiz negou algo, sugira o recurso cabível. Se o juiz citou para defesa, sugira Contestação."""},
-                {"role": "user", "content": f"Analise o texto e retorne JSON: {{'processo':'','partes':'','data_documento':'YYYY-MM-DD','tipo_documento_identificado':'','parecer_estrategico':'','peca_principal':'','rascunho_estrutura':'','outras_peticoes':'','prazo':15,'prioridade':''}}. Texto: {texto[:12000]}"}
+                {"role": "system", "content": """Você é o Diretor Jurídico Estratégico da G&N. 
+                Sua tarefa é analisar o documento e decidir a PRÓXIMA AÇÃO.
+                REGRAS CRÍTICAS:
+                1. IDENTIFIQUE o documento (Ex: Decisão que negou EPE).
+                2. NUNCA sugira a mesma peça que você identificou (Ex: Se é uma decisão de EPE, não sugira fazer outra EPE).
+                3. Foque no RECURSO ou RESPOSTA (Ex: Agravo de Instrumento, Embargos, Contestação, Apelação).
+                4. O campo 'parecer' deve analisar o risco da decisão.
+                5. O campo 'estrutura' deve ser o esqueleto da peça de RESPOSTA sugerida."""},
+                {"role": "user", "content": f"Analise e retorne este JSON exato: {{'processo':'','partes':'','data_documento':'YYYY-MM-DD','tipo_documento':'','parecer':'','peca_sugerida':'','estrutura':'','secundarias':'','prazo':15,'prioridade':''}}. Texto: {texto[:12000]}"}
             ],
             response_format={ "type": "json_object" }
         )
         return json.loads(response.choices[0].message.content)
     except Exception as e:
-        st.error(f"Erro na análise estratégica: {e}"); return None
+        st.error(f"Erro na análise: {e}"); return None
 
 # --- 🏛️ INTERFACE ---
-st.set_page_config(page_title="GN - Consultoria Estratégica", page_icon="🏛️", layout="wide")
+st.set_page_config(page_title="GN - Estratégia Jurídica", page_icon="🏛️", layout="wide")
 st.title("🏛️ G&N Intelligence: Co-piloto Estratégico")
 
 c_in, c_out = st.columns([1, 1.2], gap="large")
 
 with c_in:
-    st.subheader("📥 Entrada de Documentos")
+    st.subheader("📥 Entrada")
     pdf_input = st.file_uploader("Upload PDF:", type="pdf")
-    txt_input = st.text_area("Cole o Texto:", height=150)
+    txt_input = st.text_area("Texto Manual:", height=150)
     
     if st.button("🚀 GERAR ESTRUTURA E PARECER"):
         raw = ""
         if pdf_input: raw = "".join([p.extract_text() for p in pypdf.PdfReader(pdf_input).pages])
         elif txt_input: raw = txt_input
         if raw:
-            with st.spinner("Analisando fluxo processual e sugerindo próximo passo..."):
+            with st.spinner("Genina traçando táticas..."):
                 res = analisar_documento_co_piloto(raw)
                 if res:
                     st.session_state['res_gn'] = res
@@ -144,51 +146,54 @@ with c_out:
         resp = st.session_state['resp_gn']
         
         st.subheader("📑 Diagnóstico Estratégico")
-        st.warning(f"⚖️ **Próximo Passo:** {res.get('peca_principal', 'Analisando...')}")
+        st.warning(f"⚖️ **Peça Sugerida (PRÓXIMO PASSO):** {res.get('peca_sugerida', 'Não definida')}")
         
-        col_a, col_b = st.columns(2)
-        col_a.write(f"**Tipo identificado:** `{res.get('tipo_documento_identificado', '-')}`")
-        col_b.write(f"**Responsável:** `{resp}`")
+        # Grid de Informações
+        col_1, col_2 = st.columns(2)
+        col_1.write(f"**Doc. Identificado:** `{res.get('tipo_documento', '-')}`")
+        col_1.write(f"**Vencimento:** `{venc}`")
+        col_2.write(f"**Responsável:** `{resp}`")
+        col_2.write(f"**Processo:** `{res.get('processo', '-')}`")
         
-        st.write(f"**🔢 Processo:** `{res.get('processo', '-')}`")
-        st.write(f"**👥 Partes:** `{res.get('partes', '-')}`")
+        st.write(f"**Partes:** {res.get('partes', '-')}")
         
-        st.markdown("### 📝 Parecer de Risco e Próximo Passo")
-        st.info(res.get('parecer_estrategico', 'Sem parecer disponível.'))
+        # EXIBIÇÃO OBRIGATÓRIA DO PARECER
+        st.markdown("### 📝 Parecer e Riscos")
+        st.info(res.get('parecer', 'Análise indisponível no momento.'))
         
-        st.markdown(f"### 🛠️ Estrutura da Peça Sugerida")
-        st.text_area("Rascunho (Esqueleto):", value=res.get('rascunho_estrutura', ''), height=200)
+        # EXIBIÇÃO OBRIGATÓRIA DA ESTRUTURA
+        st.markdown(f"### 🛠️ Estrutura da Defesa/Recurso")
+        st.text_area("Esqueleto (Copiável):", value=res.get('estrutura', 'Esqueleto não gerado.'), height=250)
         
+        # EXIBIÇÃO OBRIGATÓRIA DAS SECUNDÁRIAS
         st.markdown("### 📖 Sugestões Secundárias")
-        st.write(res.get('outras_peticoes', '-'))
+        st.write(res.get('secundarias', 'Nenhuma sugestão adicional.'))
         
-        if st.button("📥 CONFIRMAR E SALVAR NA AGENDA"):
+        if st.button("📥 SALVAR NA AGENDA"):
             nova_linha = {
-                "Data Cadastro": datetime.date.today().strftime('%d/%m/%Y'),
+                "Data": datetime.date.today().strftime('%d/%m/%Y'),
                 "Processo": res.get('processo','-'), 
                 "Partes": res.get('partes','-'), 
-                "Peça Sugerida": res.get('peca_principal','-'), 
+                "Peça Sugerida": res.get('peca_sugerida','-'), 
                 "Responsável": resp, 
                 "Vencimento": venc, 
                 "Prioridade": res.get('prioridade','Média')
             }
             pd.DataFrame([nova_linha]).to_csv('prazos_gn.csv', mode='a', index=False, header=not os.path.exists('prazos_gn.csv'), sep=';', encoding='utf-8-sig')
-            st.success("✅ Caso e tática processual arquivados!")
+            st.success("✅ Tática processual arquivada!")
 
 st.divider()
 
 # --- AGENDA ---
-st.subheader("📋 Mapa de Prazos do Escritório")
+st.subheader("📋 Mapa de Prazos")
 if os.path.exists('prazos_gn.csv'):
     dados = pd.read_csv('prazos_gn.csv', sep=';')
     st.dataframe(dados, use_container_width=True)
-    col1, col2 = st.columns([1, 4])
-    with col1:
-        if st.button("🗑️ Limpar Agenda"):
+    col_a, col_b = st.columns([1, 4])
+    with col_a:
+        if st.button("🗑️ Limpar"):
             os.remove('prazos_gn.csv'); st.rerun()
-    with col2:
+    with col_b:
         pdf_bytes = gerar_relatorio_pdf(dados)
         if pdf_bytes:
             st.download_button(label="📥 BAIXAR RELATÓRIO PDF", data=pdf_bytes, file_name=f"Relatorio_GN_{datetime.date.today()}.pdf", mime="application/pdf")
-else:
-    st.info("Nenhum prazo pendente.")
